@@ -31,36 +31,50 @@ function App() {
       .then((t) => setTrades(t));
   }, []);
 
-  const pettyGames = useMemo(() => {
-    if (!highlightedTrade) {
-      return [];
+  const pettyGamesByPlayer = useMemo(() => {
+    const gamesByPlayer: Record<string, { trade: Trade; games: Game[] }> = {};
+    for (const player of trades) {
+      gamesByPlayer[player.player] = {
+        trade: player,
+        games: schedule.filter(
+          (game) =>
+            [game.away, game.home].sort().toString() ==
+            [player.previousTeam, player.newTeam].sort().toString()
+        ),
+      };
     }
-    return schedule.filter(
-      (game) =>
-        [game.away, game.home].sort().toString() ==
-        [highlightedTrade.previousTeam, highlightedTrade.newTeam]
-          .sort()
-          .toString()
-    );
-  }, [highlightedTrade, schedule]);
+    return gamesByPlayer;
+  }, [schedule, trades]);
 
-  // TODO: fix this
+  // TODO: make sure games are after player got traded.
   const pettyGamesToday = useMemo(() => {
-    const gamesToday = schedule.filter((game) => {
-      const parsedDate = parse(game.date, "EEEE, MMMM d, yyyy", new Date());
-      return parsedDate.toDateString() == new Date().toDateString();
-    });
-    return gamesToday;
-  }, [schedule]);
+    const today = [];
+    for (const [player, pettyGames] of Object.entries(pettyGamesByPlayer)) {
+      const game = pettyGames.games.find((game) => {
+        const parsedDate = parse(game.date, "EEEE, MMMM d, yyyy", new Date());
+        const fakeDate = parse(
+          "Sunday, November 10, 2024",
+          "EEEE, MMMM d, yyyy",
+          new Date()
+        );
+        return parsedDate.toDateString() == fakeDate.toDateString();
+      });
+      if (game) {
+        today.push({ player, game });
+      }
+    }
+    // group by game?
+    return today;
+  }, [pettyGamesByPlayer]);
 
   return (
     <div className="md:max-w-7xl m-auto">
       <h1>NFL Petty Games</h1>
-      <div className="flex flex-col gap-4 my-4">
+      <div className="flex flex-col gap-2 mt-4 mb-10">
         <h2>Today</h2>
-        <p>{pettyGamesToday.length ? "Petty games" : "No petty games"}</p>
-        {pettyGamesToday.map((game) => (
-          <div className="border border-gray-400 shadow-md">
+        <p>{pettyGamesToday.length ? "" : "None"}</p>
+        {pettyGamesToday.map(({ player, game }) => (
+          <div className="border border-gray-400 shadow-md p-2 w-full md:w-[512px]">
             {game.away} @ {game.home} on{" "}
             <b>
               <a
@@ -75,6 +89,9 @@ function App() {
           </div>
         ))}
       </div>
+      <p className="italic">
+        Click a player to view their petty games this year.
+      </p>
       <div className="grid grid-cols-2 mt-4">
         <table className="table-auto">
           <thead>
@@ -104,9 +121,12 @@ function App() {
               {highlightedTrade.previousTeam} to {highlightedTrade.newTeam} on{" "}
               {highlightedTrade.date}
             </p>
-            <p>{pettyGames.length ? "Petty games" : "No petty games"}</p>
-            {pettyGames.map((game) => (
-              <div className="p-4 border border-gray-400 shadow-md">
+            <p>
+              {!pettyGamesByPlayer[highlightedTrade.player].games.length &&
+                "None"}
+            </p>
+            {pettyGamesByPlayer[highlightedTrade.player].games.map((game) => (
+              <div className="p-2 border border-gray-400 shadow-md">
                 {game.away} @ {game.home} on{" "}
                 <b>
                   <a
@@ -125,7 +145,7 @@ function App() {
       </div>
       <footer className="mt-4">
         <p className="font-thin text-zinc-700">
-          This app is powered by data from nfl.com and espn.com
+          This app is powered by data from nfl.com and espn.com.
         </p>
       </footer>
     </div>
